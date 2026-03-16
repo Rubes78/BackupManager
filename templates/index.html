@@ -81,6 +81,20 @@
     .status-text { font-size: 0.85rem; color: #9ca3af; }
     .status-text.running { color: #fbbf24; }
 
+    /* Health banner */
+    .health-bar { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+    .health-card { background: #16213e; border-radius: 8px; padding: 12px 16px; border: 1px solid #2a2a4a; flex: 1; min-width: 200px; }
+    .health-card .label { font-size: 0.7rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .health-card .value { font-size: 0.9rem; font-weight: 500; }
+    .health-card .value.ok { color: #34d399; }
+    .health-card .value.warn { color: #fbbf24; }
+    .health-card .value.err { color: #ef4444; }
+    .health-card .value.muted { color: #6b7280; }
+    .source-badge { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; font-size: 0.85rem; }
+    .source-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .source-dot.online { background: #34d399; }
+    .source-dot.offline { background: #ef4444; }
+
     /* Log viewer */
     .log-panel { margin-top: 20px; }
     .log-content { background: #0f0f23; border-radius: 6px; padding: 12px; font-family: 'Courier New', monospace; font-size: 0.8rem; max-height: 250px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #a0a0c0; border: 1px solid #2a2a4a; }
@@ -93,6 +107,21 @@
 <body>
   <div class="container">
     <h1>Backup Manager</h1>
+
+    <div class="health-bar">
+      <div class="health-card">
+        <div class="label">Last Successful Backup</div>
+        <div class="value muted" id="health-success">Checking...</div>
+      </div>
+      <div class="health-card">
+        <div class="label">Last Failure</div>
+        <div class="value muted" id="health-failure">Checking...</div>
+      </div>
+      <div class="health-card">
+        <div class="label">Source Status</div>
+        <div class="value" id="health-sources">Checking...</div>
+      </div>
+    </div>
 
     <div class="panels">
       <!-- Source browser -->
@@ -365,7 +394,10 @@
     function pollStatus() {
       const interval = setInterval(async () => {
         const running = await refreshStatus();
-        if (!running) clearInterval(interval);
+        if (!running) {
+          clearInterval(interval);
+          refreshHealth();
+        }
       }, 3000);
     }
 
@@ -386,10 +418,40 @@
       return d.innerHTML.replace(/'/g, "\\'");
     }
 
+    // --- Health ---
+    async function refreshHealth() {
+      const data = await api("/api/health");
+
+      const successEl = document.getElementById("health-success");
+      if (data.last_success) {
+        successEl.textContent = data.last_success;
+        successEl.className = "value ok";
+      } else {
+        successEl.textContent = "No backups yet";
+        successEl.className = "value muted";
+      }
+
+      const failEl = document.getElementById("health-failure");
+      if (data.last_failure) {
+        failEl.textContent = data.last_failure;
+        failEl.className = "value err";
+      } else {
+        failEl.textContent = "None";
+        failEl.className = "value ok";
+      }
+
+      const srcEl = document.getElementById("health-sources");
+      srcEl.innerHTML = Object.entries(data.sources).map(([path, status]) => {
+        const name = path.split("/").filter(Boolean).pop() || path;
+        return `<span class="source-badge"><span class="source-dot ${status}"></span>${esc(name)}: ${status}</span>`;
+      }).join("");
+    }
+
     // Init
     browse("");
     loadConfig();
     refreshStatus();
+    refreshHealth();
   </script>
 </body>
 </html>

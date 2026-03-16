@@ -104,6 +104,12 @@ def generate_script(config):
             f'        exit 1',
             f'    fi',
             'fi',
+            '',
+            f'# Verify {mount} is actually reachable (not a stale mount)',
+            f'if ! timeout 10 ls "{mount}" >/dev/null 2>&1; then',
+            f'    echo "$(date): {mount} is mounted but not reachable (host offline?)" >> "$LOG"',
+            f'    exit 1',
+            'fi',
             ''
         ])
 
@@ -274,6 +280,36 @@ def get_backup_status():
     return jsonify({
         "running": backup_status["running"],
         "log": last_log
+    })
+
+
+@app.route("/api/health")
+def health_check():
+    """Parse backup log for last success/failure and check source reachability."""
+    last_success = None
+    last_failure = None
+
+    if os.path.exists(LOG_PATH):
+        with open(LOG_PATH) as f:
+            for line in f:
+                line = line.strip()
+                if "Backup complete" in line:
+                    last_success = line.split(": Backup complete")[0]
+                elif "FAILED" in line or "not reachable" in line:
+                    last_failure = line
+
+    sources = {}
+    for root in SOURCE_ROOTS:
+        try:
+            os.listdir(root)
+            sources[root] = "online"
+        except (OSError, PermissionError):
+            sources[root] = "offline"
+
+    return jsonify({
+        "last_success": last_success,
+        "last_failure": last_failure,
+        "sources": sources
     })
 
 
