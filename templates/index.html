@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Backup Manager</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    h1 { font-size: 1.5rem; margin-bottom: 20px; color: #fff; }
+
+    .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 768px) { .panels { grid-template-columns: 1fr; } }
+
+    .panel { background: #16213e; border-radius: 8px; padding: 16px; border: 1px solid #2a2a4a; }
+    .panel h2 { font-size: 1rem; margin-bottom: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+
+    /* Browser (shared between source and dest picker) */
+    .breadcrumb { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; align-items: center; }
+    .breadcrumb button { background: none; border: none; color: #7c83ff; cursor: pointer; font-size: 0.85rem; padding: 2px 4px; }
+    .breadcrumb button:hover { text-decoration: underline; }
+    .breadcrumb .sep { color: #4a4a6a; font-size: 0.8rem; }
+
+    .folder-list { max-height: 450px; overflow-y: auto; }
+    .folder-item { display: flex; align-items: center; padding: 8px 10px; border-radius: 4px; cursor: pointer; gap: 8px; font-size: 0.9rem; }
+    .folder-item:hover { background: #1a2744; }
+    .folder-item .icon { font-size: 1.1rem; flex-shrink: 0; }
+    .folder-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .folder-item .add-btn { background: #7c83ff; color: #fff; border: none; border-radius: 4px; padding: 3px 10px; cursor: pointer; font-size: 0.8rem; opacity: 0; transition: opacity 0.15s; }
+    .folder-item:hover .add-btn { opacity: 1; }
+    .folder-item .add-btn:hover { background: #6366f1; }
+
+    /* Backup list */
+    .dest-header { background: #0f0f23; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; border: 1px solid #2a2a4a; position: relative; }
+    .dest-label { font-size: 0.7rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; }
+    .dest-label .edit-hint { font-size: 0.65rem; color: #4a4a6a; text-transform: none; letter-spacing: normal; }
+    .dest-path { font-family: 'Courier New', monospace; font-size: 0.85rem; color: #7c83ff; cursor: pointer; padding: 4px 6px; border-radius: 4px; border: 1px solid transparent; transition: border-color 0.15s; }
+    .dest-path:hover { border-color: #2a2a4a; }
+    .dest-picker { margin-top: 8px; border: 1px solid #2a2a4a; border-radius: 6px; background: #1a1a2e; overflow: hidden; }
+    .dest-picker-crumb { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 10px; border-bottom: 1px solid #2a2a4a; align-items: center; background: #0f0f23; }
+    .dest-picker-crumb button { background: none; border: none; color: #7c83ff; cursor: pointer; font-size: 0.8rem; padding: 1px 3px; }
+    .dest-picker-crumb button:hover { text-decoration: underline; }
+    .dest-picker-crumb .sep { color: #4a4a6a; font-size: 0.75rem; }
+    .dest-picker-list { max-height: 200px; overflow-y: auto; }
+    .dest-picker-item { display: flex; align-items: center; padding: 6px 10px; gap: 6px; font-size: 0.8rem; cursor: pointer; }
+    .dest-picker-item:hover { background: #1a2744; }
+    .dest-picker-item .icon { font-size: 0.9rem; }
+    .dest-picker-item .name { flex: 1; }
+    .dest-picker-actions { display: flex; gap: 8px; padding: 8px 10px; border-top: 1px solid #2a2a4a; background: #0f0f23; }
+    .dest-picker-actions button { border: none; border-radius: 4px; padding: 5px 14px; cursor: pointer; font-size: 0.8rem; font-weight: 500; }
+    .dest-picker-actions .select-btn { background: #7c83ff; color: #fff; }
+    .dest-picker-actions .select-btn:hover { background: #6366f1; }
+    .dest-picker-actions .cancel-btn { background: #2a2a4a; color: #e0e0e0; }
+    .dest-picker-actions .cancel-btn:hover { background: #3a3a5a; }
+    .dest-picker-actions .current-path { flex: 1; font-family: 'Courier New', monospace; font-size: 0.75rem; color: #9ca3af; display: flex; align-items: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .backup-item { padding: 10px 12px; border-radius: 4px; background: #1a2744; margin-bottom: 6px; }
+    .backup-item.disabled { opacity: 0.5; }
+    .backup-item .mapping { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+    .backup-item .map-row { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-family: 'Courier New', monospace; }
+    .backup-item .map-label { font-size: 0.65rem; color: #6b7280; text-transform: uppercase; width: 32px; flex-shrink: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .backup-item .map-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .backup-item .map-path.from { color: #e0e0e0; }
+    .backup-item .map-path.to { color: #7c83ff; }
+    .backup-item .controls { display: flex; align-items: center; gap: 10px; }
+    .backup-item label { font-size: 0.75rem; color: #9ca3af; display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+    .backup-item input[type="checkbox"] { accent-color: #7c83ff; }
+    .backup-item .remove-btn { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1rem; padding: 0 4px; margin-left: auto; }
+    .backup-item .remove-btn:hover { color: #f87171; }
+
+    .empty { color: #6b7280; font-style: italic; padding: 20px 0; text-align: center; }
+
+    /* Actions bar */
+    .actions { margin-top: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .btn { border: none; border-radius: 6px; padding: 10px 20px; cursor: pointer; font-size: 0.9rem; font-weight: 500; }
+    .btn-primary { background: #7c83ff; color: #fff; }
+    .btn-primary:hover { background: #6366f1; }
+    .btn-primary:disabled { background: #4a4a6a; cursor: not-allowed; }
+    .btn-secondary { background: #2a2a4a; color: #e0e0e0; }
+    .btn-secondary:hover { background: #3a3a5a; }
+    .status-text { font-size: 0.85rem; color: #9ca3af; }
+    .status-text.running { color: #fbbf24; }
+
+    /* Log viewer */
+    .log-panel { margin-top: 20px; }
+    .log-content { background: #0f0f23; border-radius: 6px; padding: 12px; font-family: 'Courier New', monospace; font-size: 0.8rem; max-height: 250px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #a0a0c0; border: 1px solid #2a2a4a; }
+
+    /* Script viewer */
+    .script-toggle { background: none; border: none; color: #7c83ff; cursor: pointer; font-size: 0.85rem; margin-top: 12px; }
+    .script-content { background: #0f0f23; border-radius: 6px; padding: 12px; font-family: 'Courier New', monospace; font-size: 0.8rem; max-height: 300px; overflow-y: auto; white-space: pre; color: #a0a0c0; border: 1px solid #2a2a4a; margin-top: 8px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Backup Manager</h1>
+
+    <div class="panels">
+      <!-- Source browser -->
+      <div class="panel">
+        <h2>Browse Source</h2>
+        <div class="breadcrumb" id="breadcrumb"></div>
+        <div class="folder-list" id="browser"></div>
+      </div>
+
+      <!-- Backup list -->
+      <div class="panel">
+        <h2>Active Backups</h2>
+        <div class="dest-header">
+          <div class="dest-label">All backups write to <span class="edit-hint">click to change</span></div>
+          <div class="dest-path" id="dest-path" onclick="openDestPicker()"></div>
+          <div class="dest-picker" id="dest-picker" style="display:none;">
+            <div class="dest-picker-crumb" id="dest-picker-crumb"></div>
+            <div class="dest-picker-list" id="dest-picker-list"></div>
+            <div class="dest-picker-actions">
+              <span class="current-path" id="dest-picker-selected"></span>
+              <button class="cancel-btn" onclick="closeDestPicker()">Cancel</button>
+              <button class="select-btn" onclick="selectDest()">Select</button>
+            </div>
+          </div>
+        </div>
+        <div id="backup-list"></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="run-btn" onclick="runBackup()">Run Backup Now</button>
+      <button class="btn btn-secondary" onclick="refreshStatus()">Refresh Status</button>
+      <span class="status-text" id="status-text"></span>
+    </div>
+
+    <div class="log-panel">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+        <h2 style="font-size:1rem; color:#9ca3af; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Recent Log</h2>
+        <button class="script-toggle" onclick="toggleScript()">View Generated Script</button>
+      </div>
+      <div class="log-content" id="log-content">Loading...</div>
+      <div class="script-content" id="script-content"></div>
+    </div>
+  </div>
+
+  <script>
+    let config = { dest: "", folders: [] };
+    let currentPath = "";
+
+    async function api(url, opts) {
+      const res = await fetch(url, opts);
+      return res.json();
+    }
+
+    // --- Source browser (absolute paths, scope=source) ---
+    async function browse(path) {
+      currentPath = path;
+      const data = await api(`/api/browse?scope=source&path=${encodeURIComponent(path)}`);
+      if (data.error) return;
+
+      renderBreadcrumb(path);
+      const el = document.getElementById("browser");
+
+      if (data.entries.length === 0) {
+        el.innerHTML = '<div class="empty">No subdirectories</div>';
+        return;
+      }
+
+      el.innerHTML = data.entries.map(e => `
+        <div class="folder-item">
+          <span class="icon">📁</span>
+          <span class="name" onclick="browse('${esc(e.path)}')">${esc(e.name)}</span>
+          <button class="add-btn" onclick="event.stopPropagation(); addFolder('${esc(e.path)}')">+ Add</button>
+        </div>
+      `).join("");
+    }
+
+    function renderBreadcrumb(path) {
+      const el = document.getElementById("breadcrumb");
+      if (!path) {
+        el.innerHTML = `<button style="color:#9ca3af; cursor:default;">Select a source location</button>`;
+        return;
+      }
+      const parts = path.split("/").filter(Boolean);
+      let html = `<button onclick="browse('')">/</button>`;
+      let cumulative = "";
+      for (const p of parts) {
+        cumulative += "/" + p;
+        const cp = cumulative;
+        html += `<span class="sep">/</span><button onclick="browse('${esc(cp)}')">${esc(p)}</button>`;
+      }
+      el.innerHTML = html;
+    }
+
+    // --- Dest picker (absolute paths, scope=dest) ---
+    let destPickerPath = "";
+
+    async function openDestPicker() {
+      document.getElementById("dest-picker").style.display = "block";
+      destPickerPath = config.dest || "/Media/Backups/mcrubesdesktop";
+      await browseDestTo(destPickerPath);
+    }
+
+    function closeDestPicker() {
+      document.getElementById("dest-picker").style.display = "none";
+    }
+
+    async function browseDestTo(path) {
+      destPickerPath = path;
+      const data = await api(`/api/browse?scope=dest&path=${encodeURIComponent(path)}`);
+      if (data.error) {
+        if (path.includes("/")) {
+          await browseDestTo(path.substring(0, path.lastIndexOf("/")));
+        } else {
+          await browseDestTo("");
+        }
+        return;
+      }
+
+      const crumbEl = document.getElementById("dest-picker-crumb");
+      if (!path) {
+        crumbEl.innerHTML = `<button style="color:#9ca3af; cursor:default;">Select a destination</button>`;
+      } else {
+        const parts = path.split("/").filter(Boolean);
+        let html = `<button onclick="browseDestTo('')">/</button>`;
+        let cumulative = "";
+        for (const p of parts) {
+          cumulative += "/" + p;
+          const cp = cumulative;
+          html += `<span class="sep">/</span><button onclick="browseDestTo('${esc(cp)}')">${esc(p)}</button>`;
+        }
+        crumbEl.innerHTML = html;
+      }
+
+      const listEl = document.getElementById("dest-picker-list");
+      if (data.entries.length === 0) {
+        listEl.innerHTML = '<div style="padding:12px;color:#6b7280;font-style:italic;text-align:center;font-size:0.8rem;">No subdirectories</div>';
+      } else {
+        listEl.innerHTML = data.entries.map(e => `
+          <div class="dest-picker-item" onclick="browseDestTo('${esc(e.path)}')">
+            <span class="icon">📁</span>
+            <span class="name">${esc(e.name)}</span>
+          </div>
+        `).join("");
+      }
+
+      document.getElementById("dest-picker-selected").textContent = path || "(none)";
+    }
+
+    async function selectDest() {
+      if (!destPickerPath) return;
+      config.dest = destPickerPath;
+      await api("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config)
+      });
+      closeDestPicker();
+      await loadConfig();
+    }
+
+    // --- Backup list ---
+    async function loadConfig() {
+      config = await api("/api/config");
+      renderBackupList();
+    }
+
+    function renderBackupList() {
+      const el = document.getElementById("backup-list");
+      const destEl = document.getElementById("dest-path");
+      destEl.textContent = config.dest || "/Media/Backups/mcrubesdesktop";
+
+      if (!config.folders || config.folders.length === 0) {
+        el.innerHTML = '<div class="empty">No folders added yet. Browse and click + Add.</div>';
+        return;
+      }
+      const dest = config.dest || "/Media/Backups/mcrubesdesktop";
+      el.innerHTML = config.folders.map(f => {
+        // Compute the destination subdir (strip source root prefix)
+        const srcPath = f.path;
+        const lastSlash = srcPath.lastIndexOf("/");
+        const destSubdir = lastSlash > 0 ? srcPath.substring(srcPath.indexOf("/", 1)) : srcPath;
+        return `
+        <div class="backup-item ${f.enabled ? '' : 'disabled'}">
+          <div class="mapping">
+            <div class="map-row">
+              <span class="map-label">from</span>
+              <span class="map-path from" title="${esc(srcPath)}">${esc(srcPath)}/</span>
+            </div>
+            <div class="map-row">
+              <span class="map-label">to</span>
+              <span class="map-path to" title="${esc(dest)}${esc(destSubdir)}">${esc(dest)}${esc(destSubdir)}/</span>
+            </div>
+          </div>
+          <div class="controls">
+            <label><input type="checkbox" ${f.enabled ? 'checked' : ''} onchange="toggleEnabled('${esc(f.path)}', this.checked)"> Enabled</label>
+            <label title="Mirror mode: delete files at destination that no longer exist at source"><input type="checkbox" ${f.delete ? 'checked' : ''} onchange="toggleDelete('${esc(f.path)}', this.checked)"> Mirror (--delete)</label>
+            <button class="remove-btn" onclick="removeFolder('${esc(f.path)}')" title="Remove">✕</button>
+          </div>
+        </div>`;
+      }).join("");
+    }
+
+    async function addFolder(path) {
+      const res = await api("/api/folder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, delete: true })
+      });
+      if (res.error) { alert(res.error); return; }
+      await loadConfig();
+    }
+
+    async function removeFolder(path) {
+      await api("/api/folder", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path })
+      });
+      await loadConfig();
+    }
+
+    async function toggleEnabled(path, enabled) {
+      await api("/api/folder/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, enabled })
+      });
+      await loadConfig();
+    }
+
+    async function toggleDelete(path, del) {
+      await api("/api/folder/delete-mode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, delete: del })
+      });
+      await loadConfig();
+    }
+
+    // --- Backup execution ---
+    async function runBackup() {
+      const btn = document.getElementById("run-btn");
+      btn.disabled = true;
+      const res = await api("/api/backup/run", { method: "POST" });
+      if (res.error) { alert(res.error); btn.disabled = false; return; }
+      pollStatus();
+    }
+
+    async function refreshStatus() {
+      const data = await api("/api/backup/status");
+      const st = document.getElementById("status-text");
+      const btn = document.getElementById("run-btn");
+      const log = document.getElementById("log-content");
+
+      if (data.running) {
+        st.textContent = "Backup running...";
+        st.className = "status-text running";
+        btn.disabled = true;
+      } else {
+        st.textContent = "Idle";
+        st.className = "status-text";
+        btn.disabled = false;
+      }
+      log.textContent = data.log || "No log data";
+      log.scrollTop = log.scrollHeight;
+      return data.running;
+    }
+
+    function pollStatus() {
+      const interval = setInterval(async () => {
+        const running = await refreshStatus();
+        if (!running) clearInterval(interval);
+      }, 3000);
+    }
+
+    async function toggleScript() {
+      const el = document.getElementById("script-content");
+      if (el.style.display === "block") {
+        el.style.display = "none";
+        return;
+      }
+      const data = await api("/api/script");
+      el.textContent = data.script || "Script not found";
+      el.style.display = "block";
+    }
+
+    function esc(s) {
+      const d = document.createElement("div");
+      d.textContent = s;
+      return d.innerHTML.replace(/'/g, "\\'");
+    }
+
+    // Init
+    browse("");
+    loadConfig();
+    refreshStatus();
+  </script>
+</body>
+</html>

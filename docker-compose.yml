@@ -1,0 +1,22 @@
+services:
+  backup-manager:
+    build: .
+    container_name: backup-manager
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8081}:5000"
+    volumes:
+      - ${SOURCE_MOUNT}:${SOURCE_MOUNT}:ro
+      - ${DEST_MOUNT}:${DEST_MOUNT}
+      - ${SCRIPT_PATH}:/data/backup.sh
+      - backup-data:/data
+    environment:
+      - TZ=${TZ:-America/Chicago}
+      - DEFAULT_DEST=${DEFAULT_DEST}
+      - LOG_PATH=${DEFAULT_DEST}/backup.log
+      - SCRIPT_PATH=/data/backup.sh
+      - SOURCE_ROOTS=${SOURCE_ROOTS}
+      - DEST_ROOTS=${DEST_ROOTS}
+
+volumes:
+  backup-data:
