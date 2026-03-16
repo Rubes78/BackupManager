@@ -13,7 +13,6 @@ services:
     environment:
       - TZ=${TZ:-America/Chicago}
       - DEFAULT_DEST=${DEFAULT_DEST}
-      - LOG_PATH=${DEFAULT_DEST}/backup.log
       - SCRIPT_PATH=/data/backup.sh
       - SOURCE_ROOTS=${SOURCE_ROOTS}
       - DEST_ROOTS=${DEST_ROOTS}

@@ -10,8 +10,13 @@ app = Flask(__name__)
 
 CONFIG_PATH = os.environ.get("CONFIG_PATH", "/data/config.json")
 SCRIPT_PATH = os.environ.get("SCRIPT_PATH", "/data/backup.sh")
-LOG_PATH = os.environ.get("LOG_PATH", "/data/backup.log")
 DEFAULT_DEST = os.environ.get("DEFAULT_DEST", "/backup")
+
+
+def get_log_path():
+    """Derive log path from current config dest, so it stays in sync."""
+    config = load_config()
+    return os.path.join(config["dest"], "backup.log")
 SOURCE_ROOTS = [r.strip() for r in os.environ.get("SOURCE_ROOTS", "/source").split(",")]
 DEST_ROOTS = [r.strip() for r in os.environ.get("DEST_ROOTS", "/backup").split(",")]
 
@@ -272,8 +277,9 @@ def run_backup():
 @app.route("/api/backup/status")
 def get_backup_status():
     last_log = ""
-    if os.path.exists(LOG_PATH):
-        with open(LOG_PATH) as f:
+    log_path = get_log_path()
+    if os.path.exists(log_path):
+        with open(log_path) as f:
             lines = f.readlines()
             last_log = "".join(lines[-30:])
 
@@ -289,8 +295,9 @@ def health_check():
     last_success = None
     last_failure = None
 
-    if os.path.exists(LOG_PATH):
-        with open(LOG_PATH) as f:
+    log_path = get_log_path()
+    if os.path.exists(log_path):
+        with open(log_path) as f:
             for line in f:
                 line = line.strip()
                 if "Backup complete" in line:
