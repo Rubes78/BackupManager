@@ -113,16 +113,10 @@ def generate_script(config):
             ''
         ])
 
-    # Create all destination subdirectories up front
+    # Use just the folder basename as the destination subdirectory
     dest_subdirs = []
     for folder in enabled_folders:
-        src_path = folder["path"]
-        dest_subdir = src_path
-        for root in SOURCE_ROOTS:
-            if src_path == root or src_path.startswith(root + "/"):
-                dest_subdir = src_path[len(root):].lstrip("/")
-                break
-        dest_subdirs.append(dest_subdir)
+        dest_subdirs.append(os.path.basename(folder["path"].rstrip("/")))
 
     mkdir_paths = " ".join(f'"$DEST/{d}"' for d in dest_subdirs)
     lines.extend([

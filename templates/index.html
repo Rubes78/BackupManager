@@ -300,10 +300,10 @@
       }
       const dest = config.dest || "/Media/Backups/mcrubesdesktop";
       el.innerHTML = config.folders.map(f => {
-        // Compute the destination subdir (strip source root prefix)
+        // Use just the folder basename as the destination subdirectory
         const srcPath = f.path;
-        const lastSlash = srcPath.lastIndexOf("/");
-        const destSubdir = lastSlash > 0 ? srcPath.substring(srcPath.indexOf("/", 1)) : srcPath;
+        const parts = srcPath.replace(/\/+$/, "").split("/");
+        const destSubdir = "/" + parts[parts.length - 1];
         return `
         <div class="backup-item ${f.enabled ? '' : 'disabled'}">
           <div class="mapping">
