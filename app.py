@@ -113,20 +113,26 @@ def generate_script(config):
             ''
         ])
 
-    lines.extend([
-        'mkdir -p "$DEST"',
-        'echo "$(date): Starting backup" >> "$LOG"',
-        ''
-    ])
-
+    # Create all destination subdirectories up front
+    dest_subdirs = []
     for folder in enabled_folders:
         src_path = folder["path"]
-        # Destination subdir: strip the source root to get relative path
         dest_subdir = src_path
         for root in SOURCE_ROOTS:
             if src_path == root or src_path.startswith(root + "/"):
                 dest_subdir = src_path[len(root):].lstrip("/")
                 break
+        dest_subdirs.append(dest_subdir)
+
+    mkdir_paths = " ".join(f'"$DEST/{d}"' for d in dest_subdirs)
+    lines.extend([
+        f'mkdir -p {mkdir_paths}',
+        'echo "$(date): Starting backup" >> "$LOG"',
+        ''
+    ])
+
+    for folder, dest_subdir in zip(enabled_folders, dest_subdirs):
+        src_path = folder["path"]
         delete = "--delete " if folder.get("delete", True) else ""
         lines.append(f'rsync -av {delete}"{src_path}/" "$DEST/{dest_subdir}/" >> "$LOG" 2>&1')
 
