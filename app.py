@@ -97,6 +97,18 @@ def generate_script(config):
         '#!/bin/bash',
         f'LOG="{dest}/backup.log"',
         f'DEST="{dest}"',
+        f'LOCK="/tmp/backup-desktop.lock"',
+        '',
+        '# Prevent concurrent runs',
+        'if [ -f "$LOCK" ]; then',
+        '    LOCK_PID=$(cat "$LOCK")',
+        '    if kill -0 "$LOCK_PID" 2>/dev/null; then',
+        '        echo "$(date): Backup already running (PID $LOCK_PID), skipping" >> "$LOG"',
+        '        exit 0',
+        '    fi',
+        'fi',
+        'echo $$ > "$LOCK"',
+        'trap \'rm -f "$LOCK"\' EXIT',
         '',
     ]
 
