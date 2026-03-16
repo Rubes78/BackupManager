@@ -1,6 +1,6 @@
 services:
   backup-manager:
-    build: .
+    build: https://github.com/Rubes78/BackupManager.git
     container_name: backup-manager
     restart: unless-stopped
     ports:
